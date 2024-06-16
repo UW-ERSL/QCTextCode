@@ -412,28 +412,40 @@ if (testCase == 1):
 	A = np.array([[1,0],[0,0.75]])
 	v0 = np.array([1,0])
 	v1 = np.array([0,1])
-	v = v1
+	a0 = 1/2
+	a1 =  np.sqrt(3)/2
+	v = a0*v0 +  a1*v1
 	f = 0.5
 	lambdaMax = 1
-	counts = myQPE3(A,v,f,lambdaMax,1000,m=3)
+	m = 3
+	counts = myQPE3(A,v,f,lambdaMax,1000,m=m)
 elif (testCase == 2):
 	A = np.array([[2,-1],[-1,2]])
 	v0 = np.array([1/np.sqrt(2),1/np.sqrt(2)])
 	v1 = np.array([1/np.sqrt(2),-1/np.sqrt(2)])
-	v = v0
+	a0 = 1/2
+	a1 =  np.sqrt(3)/2
+	v = a0*v0 +  a1*v1
 	f = 0.75
 	lambdaMax = 3
-	counts = myQPE3(A,v,f,lambdaMax,1000,m=2)
+	m = 3
+	counts = myQPE3(A,v,f,lambdaMax,1000,m=m)
 elif (testCase == 3):
 	A = np.array([[1,0,0,-0.5],[0,1,0,0],[0,0,1,0],[-0.5,0,0,1]])
 	v0 = np.array([1/np.sqrt(2),0,0,-1/np.sqrt(2)])
 	v1 = np.array([1/np.sqrt(2),0,0,1/np.sqrt(2)])
 	v2 = np.array([0,1,0,0])
 	v3 = np.array([0,0,1,0])
-	v = v3
-	f = 0.8
-	lambdaMax = 2.5
-	counts = myQPE3(A,v,f,lambdaMax,1000,m=10)
+	a0 = 1/np.sqrt(2)
+	a1 = 1/np.sqrt(2)
+	a2 =0
+	a3 = 0
+	v = a0*v0 + a1*v1 + a2*v2 + a3*v3
+	
+	f = 0.5
+	lambdaMax = 1.5
+	m = 10
+	counts = myQPE3(A,v,f,lambdaMax,1000,m=m)
 
 print("counts:", counts)
 [thetaValues, probabilities] = processCounts(counts)
