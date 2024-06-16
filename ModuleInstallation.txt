@@ -1,0 +1,42 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Jun  5 12:46:08 2024
+
+@author: Krishnan Suresh
+conda remove -n quantum --all
+"""
+%############### Anaconda installation
+conda create -n quantum  
+conda activate quantum
+conda install pip
+conda install spyder
+conda install matplotlib
+pip install pylatexenc
+
+%############### D-Wave installation
+conda activate quantum
+pip install dwave-system
+pip install dwave-neal
+pip install dwave-ocean-sdk
+dwave config create
+ 
+%############### Qiskit installation
+conda activate quantum
+pip install qiskit[visualization]
+pip install qiskit-ibm-runtime
+pip install qiskit-aer
+
+%###############
+from qiskit_ibm_provider import IBMProvider
+IBMProvider.save_account(token='Your API here', overwrite=True)
+
+
+%############### Pennylane installation (not needed)
+conda activate quantum
+pip install pennylane --upgrad
+pip install pennylane-lightning
+pip install pennylane-lightning[gpu]
+pip install pennylane-qiskit
+pip install autograd 
+
+
