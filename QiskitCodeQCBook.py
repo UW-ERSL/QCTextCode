@@ -4,23 +4,17 @@ Created on Tue Jun  4 12:16:44 2024
 
 @author: Krishnan Suresh
 """
-from qiskit import QuantumCircuit, transpile
-from qiskit_aer import Aer
-from IPython.display import display
-from qiskit.quantum_info import Statevector, Operator
-from qiskit_ibm_runtime import QiskitRuntimeService
-from qiskit.visualization import plot_histogram
-from qiskit.circuit.library import UnitaryGate, HamiltonianGate
-from qiskit.circuit.library import QFT
-import matplotlib.pyplot as plt
-import numpy as np
 
 
 #%% Qiskit authentication and test
-QiskitRuntimeService.save_account(channel="ibm_quantum",
-token="Your API here",set_as_default=True, overwrite=True)
- 
+from qiskit_ibm_runtime import QiskitRuntimeService
+# QiskitRuntimeService.save_account(channel="ibm_quantum",
+# token="Your API here",set_as_default=True, overwrite=True)
 
+
+#%% Sample Qiskit code to run on a simulator
+from qiskit import QuantumCircuit, transpile
+from qiskit_aer import Aer
 circuit = QuantumCircuit(1, 1) 
 circuit.h(0) # apply H to qubit 0
 # measure and place result in classical bit
@@ -28,14 +22,37 @@ circuit.measure(0, 0)
 circuit.draw('mpl') 
 
 backend = Aer.get_backend('qasm_simulator')
-new_circuit = transpile(circuit, backend)
-job = backend.run(new_circuit,shots = 1000)
+transpiled_circuit = transpile(circuit, backend)
+job = backend.run(transpiled_circuit,shots = 1000)
 counts = job.result().get_counts(circuit)
 print("Counts:\n",counts)
 
+#%% Run on a real IBM quantum machine
+from qiskit_ibm_runtime import SamplerV2 as Sampler
+if (0): # Change to 1 to run on a real IBM quantum machine
+	service = QiskitRuntimeService()
+	backend = service.least_busy(operational=True, simulator=False)
+	print(backend)
+	circuit = QuantumCircuit(1)
+	circuit.h(0)
+	circuit.measure_all()
+	transpiled_circuit = transpile(circuit, backend)
+	sampler = Sampler(backend)
+	job = sampler.run([transpiled_circuit],shots = 1000)
+	print(f"job id: {job.job_id()}")
+	result = job.result()
+	print(result)
+#%% Modules needed for al examples below
+from qiskit import QuantumCircuit, transpile
+from IPython.display import display
+from qiskit.quantum_info import Statevector, Operator
+from qiskit.visualization import plot_histogram
+from qiskit.circuit.library import UnitaryGate, HamiltonianGate
+from qiskit.circuit.library import QFT, PhaseEstimation
+import matplotlib.pyplot as plt
+import numpy as np
 
 #%% Complex
-
 x = 1 + 3j # note the 3j
 print("The real part is: ", x.real)
 print("The imaginary part is: ", x.imag)
@@ -309,13 +326,11 @@ display(psi.draw('latex'))
 #%% Hamiltonian
 A = np.array([[2,-1],[-1,2]])
 f = 0.5
-lambdaMax = 3
-t = -2*np.pi*f/lambdaMax #Note negative
+lambdaHat = 3
+t = -2*np.pi*f/lambdaHat #Note negative
 U_A = HamiltonianGate(A, time=t,label = 'UA')
 print(np.array(U_A.to_matrix()))
-
 v = np.array([1/np.sqrt(2),-1/np.sqrt(2)])
-
 circuit = QuantumCircuit(1)
 circuit.prepare_state(Statevector(v) ,0,'Prepare v')
 circuit.append(U_A, qargs=[0])
@@ -325,11 +340,11 @@ display(psi.draw('latex'))
 
 
 #%% Single digit QPE with single qubit v
-def myQPE1(A,v,f,lambdaMax,nShots):
+def myQPE1(A,v,f,lambdaHat,nShots):
 	circuit = QuantumCircuit(2,1)
 	circuit.h(0)
 	circuit.prepare_state(Statevector(v),[1],' v')
-	t = -2*np.pi*f/lambdaMax #Note negative
+	t = -2*np.pi*f/lambdaHat #Note negative
 	U_A = HamiltonianGate(A, time=t,label = 'UA')
 	UControl = U_A.control(1)
 	circuit.append(UControl,[0,1])
@@ -342,12 +357,12 @@ def myQPE1(A,v,f,lambdaMax,nShots):
 	return counts
 
 #%% Single digit QPE with multiple qubits v
-def myQPE2(A,v,f,lambdaMax,nShots):
+def myQPE2(A,v,f,lambdaHat,nShots):
 	n = int(np.log2(v.shape[0]))
 	circuit = QuantumCircuit(n+1,1)
 	circuit.h(0)
 	circuit.prepare_state(Statevector(v),[*range(1, n+1)],'v')
-	t = -2*np.pi*f/lambdaMax #Note negative
+	t = -2*np.pi*f/lambdaHat #Note negative
 	U_A = HamiltonianGate(A, time=t,label = 'UA')
 	UControl = U_A.control(1) # only 1 control qubit
 	circuit.append(UControl,[*range(0, n+1)])
@@ -359,13 +374,13 @@ def myQPE2(A,v,f,lambdaMax,nShots):
 
 
 #%% Multiple digit QPE with multiple qubits v
-def myQPE3(A,v,f,lambdaMax,nShots,m=1):
+def myQPE3(A,v,f,lambdaHat,nShots,m=1):
 	n = int(np.log2(v.shape[0]))
 	circuit = QuantumCircuit(n+m,m)
 	for i in range(m):
 		circuit.h(i)
 	circuit.prepare_state(Statevector(v),[*range(m, n+m)],'v')
-	t = -2*np.pi*f/lambdaMax #Note negative
+	t = -2*np.pi*f/lambdaHat #Note negative
 	U_A = HamiltonianGate(A, time=t,label = 'UA')
 	U_A._name = 'UA'
 	for i in range(m):
@@ -380,7 +395,7 @@ def myQPE3(A,v,f,lambdaMax,nShots,m=1):
 	counts = simulateCircuit(circuit,nShots)
 	return counts
 
-#%% Utility function processCounts
+#%% Utility function processCounts for QPE
 def processCounts(counts):
 	# Input:  counts from circuit simulation
 	# Return: decimal values (list) and probabilities (list), 
@@ -403,12 +418,10 @@ def processCounts(counts):
 	probabilties = probabilties/totalCount
 	return [decimalValues,probabilties]
 
-
-
-#%%
+#%% Test cases for QPE
 plt.close('all')
-testCase = 3
-if (testCase == 1):
+example = 1
+if (example == 1):
 	A = np.array([[1,0],[0,0.75]])
 	v0 = np.array([1,0])
 	v1 = np.array([0,1])
@@ -416,10 +429,11 @@ if (testCase == 1):
 	a1 =  np.sqrt(3)/2
 	v = a0*v0 +  a1*v1
 	f = 0.5
-	lambdaMax = 1
+	lambdaHat = 1
 	m = 3
-	counts = myQPE3(A,v,f,lambdaMax,1000,m=m)
-elif (testCase == 2):
+	nShots = 1000
+	counts = myQPE1(A,v,f,lambdaHat,nShots)
+elif (example == 2):
 	A = np.array([[2,-1],[-1,2]])
 	v0 = np.array([1/np.sqrt(2),1/np.sqrt(2)])
 	v1 = np.array([1/np.sqrt(2),-1/np.sqrt(2)])
@@ -427,10 +441,11 @@ elif (testCase == 2):
 	a1 =  np.sqrt(3)/2
 	v = a0*v0 +  a1*v1
 	f = 0.75
-	lambdaMax = 3
+	lambdaHat = 3
 	m = 3
-	counts = myQPE3(A,v,f,lambdaMax,1000,m=m)
-elif (testCase == 3):
+	nShots = 1000
+	counts = myQPE1(A,v,f,lambdaHat,nShots)
+elif (example == 3):
 	A = np.array([[1,0,0,-0.5],[0,1,0,0],[0,0,1,0],[-0.5,0,0,1]])
 	v0 = np.array([1/np.sqrt(2),0,0,-1/np.sqrt(2)])
 	v1 = np.array([1/np.sqrt(2),0,0,1/np.sqrt(2)])
@@ -441,15 +456,43 @@ elif (testCase == 3):
 	a2 =0
 	a3 = 0
 	v = a0*v0 + a1*v1 + a2*v2 + a3*v3
-	
 	f = 0.5
-	lambdaMax = 1.5
+	lambdaHat = 1.5
 	m = 10
-	counts = myQPE3(A,v,f,lambdaMax,1000,m=m)
-
+	nShots = 1000
+	counts = myQPE1(A,v,f,lambdaHat,nShots)
+elif (example == 4):
+	A = np.array([[2,-1,0,0],[-1,2,-1,0],[0,-1,2,-1],[0,0,-1,2]])
+	v = np.random.rand(4)
+	v = v/np.linalg.norm(v)
+	f = 0.5
+	lambdaHat = 4
+	m = 10
+	nShots = 1000
+	counts = myQPE3(A,v,f,lambdaHat,nShots,m)
+	
 print("counts:", counts)
 [thetaValues, probabilities] = processCounts(counts)
 print("theta:", thetaValues)
 print("probability:",probabilities)
 print("Weighted average",np.sum(thetaValues*probabilities))
+print("Eigenvalues:",thetaValues*lambdaHat/f)
+
+#%% Using the Built in QPE
+m = 3
+A = np.array([[2,-1,0,0],[-1,2,-1,0],[0,-1,2,-1],[0,0,-1,2]])
+v = np.random.rand(4)
+v = v/np.linalg.norm(v)
+f = 0.5
+lambdaHat = 4
+
+t = -2*np.pi*f/lambdaHat #Note negative
+U_A = HamiltonianGate(A, time=t,label = 'UA')
+iqft = QFT(num_qubits=m,inverse=True).to_gate()
+iqft._name = 'IQFT'
+qpe = PhaseEstimation(m,U_A,iqft)
+
+#%%
+
+
 	
