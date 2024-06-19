@@ -340,7 +340,7 @@ display(psi.draw('latex'))
 
 
 #%% Single digit QPE with single qubit v
-def myQPE1(A,v,f,lambdaHat,nShots):
+def myQPE1(A,v,f,lambdaHat):
 	circuit = QuantumCircuit(2,1)
 	circuit.h(0)
 	circuit.prepare_state(Statevector(v),[1],' v')
@@ -353,11 +353,11 @@ def myQPE1(A,v,f,lambdaHat,nShots):
 	circuit.append(iqft, [0])
 	circuit.measure([0], [0]) 
 	circuit.draw('mpl') 
-	counts = simulateCircuit(circuit,nShots)
+	counts = simulateCircuit(circuit,nShots=1)
 	return counts
 
 #%% Single digit QPE with multiple qubits v
-def myQPE2(A,v,f,lambdaHat,nShots):
+def myQPE2(A,v,f,lambdaHat):
 	n = int(np.log2(v.shape[0]))
 	circuit = QuantumCircuit(n+1,1)
 	circuit.h(0)
@@ -370,11 +370,10 @@ def myQPE2(A,v,f,lambdaHat,nShots):
 	iqft._name = 'IQFT'
 	circuit.append(iqft, [0])
 	circuit.measure([0], [0]) 
-	return simulateCircuit(circuit,nShots)
-
+	return simulateCircuit(circuit,nShots=1)
 
 #%% Multiple digit QPE with multiple qubits v
-def myQPE3(A,v,f,lambdaHat,nShots,m=1):
+def myQPE3(A,v,f,lambdaHat,m=1):
 	n = int(np.log2(v.shape[0]))
 	circuit = QuantumCircuit(n+m,m)
 	for i in range(m):
@@ -392,75 +391,76 @@ def myQPE3(A,v,f,lambdaHat,nShots,m=1):
 	circuit.append(iqft, [*range(0,m)])
 	circuit.measure([*range(0,m)], [*range(0,m)]) 
 	#circuit.draw('mpl') 
-	counts = simulateCircuit(circuit,nShots)
+	counts = simulateCircuit(circuit,nShots=50)
 	return counts
 
 #%% Utility function processCounts for QPE
 def processCounts(counts):
-	# Input:  counts from circuit simulation
-	# Return: decimal values (list) and probabilities (list), 
-	# sorted based on descending likelihood
-	
+	# Input:  counts from circuit simulation 
+	# Return: decimal values sorted by descending probability
 	# First sort descending using 2nd item in dictionary
 	countsSorted = sorted(counts.items(),
 		key=lambda item: item[1],reverse=True)
-	m = len( countsSorted[0][0]) # length of bit string
-	decimalValues = np.empty((0))
-	probabilties =  np.empty((0)) 
-	totalCount = 0
-	for i in range(len(counts)):
+	m = len(countsSorted[0][0]) # length of bit string
+	values = []
+	for i in range(len(countsSorted)):
 		string = countsSorted[i][0]
-		value = (int(string, 2)/(2**m))
-		decimalValues = np.append(decimalValues, value)
-		nCounts = countsSorted[i][1]
-		probabilties = np.append(probabilties, nCounts)
-		totalCount = totalCount + nCounts
-	probabilties = probabilties/totalCount
-	return [decimalValues,probabilties]
+		values.append(int(string, 2)/(2**m))
+	return np.array(values)
+
+#%% Kitaev circuit
+def KitaevCircuit(A,v,f,lambdaHat,nShots):
+	n = int(np.log2(v.shape[0]))
+	circuit = QuantumCircuit(n+1,1)
+	circuit.h(0)
+	circuit.prepare_state(Statevector(v),[*range(1, n+1)],'v')
+	t = -2*np.pi*f/lambdaHat #Note negative
+	U_A = HamiltonianGate(A, time=t,label = 'UA')
+	UControl = U_A.control(1) # only 1 control qubit
+	circuit.append(UControl,[*range(0, n+1)])
+	circuit.h(0)
+	circuit.measure([0], [0]) 
+	circuit.draw('mpl')
+	return simulateCircuit(circuit,nShots)
+
 
 #%% Test cases for QPE
 plt.close('all')
-example = 1
+example = 4
 if (example == 1):
 	A = np.array([[1,0],[0,0.75]])
 	v0 = np.array([1,0])
 	v1 = np.array([0,1])
 	a0 = 1/2
-	a1 =  np.sqrt(3)/2
+	a1 = np.sqrt(3)/2
 	v = a0*v0 +  a1*v1
 	f = 0.5
 	lambdaHat = 1
 	m = 3
-	nShots = 1000
-	counts = myQPE1(A,v,f,lambdaHat,nShots)
+	counts = myQPE3(A,v,f,lambdaHat,m=m)
 elif (example == 2):
 	A = np.array([[2,-1],[-1,2]])
 	v0 = np.array([1/np.sqrt(2),1/np.sqrt(2)])
 	v1 = np.array([1/np.sqrt(2),-1/np.sqrt(2)])
-	a0 = 1/2
-	a1 =  np.sqrt(3)/2
+	a0 = 1
+	a1 = 0
 	v = a0*v0 +  a1*v1
-	f = 0.75
+	f = 0.5
 	lambdaHat = 3
-	m = 3
-	nShots = 1000
-	counts = myQPE1(A,v,f,lambdaHat,nShots)
+	m = 10
+	counts = myQPE3(A,v,f,lambdaHat,m=m)
 elif (example == 3):
 	A = np.array([[1,0,0,-0.5],[0,1,0,0],[0,0,1,0],[-0.5,0,0,1]])
 	v0 = np.array([1/np.sqrt(2),0,0,-1/np.sqrt(2)])
 	v1 = np.array([1/np.sqrt(2),0,0,1/np.sqrt(2)])
 	v2 = np.array([0,1,0,0])
 	v3 = np.array([0,0,1,0])
-	a0 = 1/np.sqrt(2)
-	a1 = 1/np.sqrt(2)
-	a2 =0
-	a3 = 0
-	v = a0*v0 + a1*v1 + a2*v2 + a3*v3
+	a = [1/np.sqrt(4),1/np.sqrt(4),1/np.sqrt(4),1/np.sqrt(4)]
+	v = a[0]*v0 + a[1]*v1 + a[2]*v2 + a[3]*v3
 	f = 0.5
 	lambdaHat = 1.5
 	m = 10
-	nShots = 1000
-	counts = myQPE1(A,v,f,lambdaHat,nShots)
+	counts = myQPE3(A,v,f,lambdaHat,m=m)
 elif (example == 4):
 	A = np.array([[2,-1,0,0],[-1,2,-1,0],[0,-1,2,-1],[0,0,-1,2]])
 	v = np.random.rand(4)
@@ -468,15 +468,12 @@ elif (example == 4):
 	f = 0.5
 	lambdaHat = 4
 	m = 10
-	nShots = 1000
-	counts = myQPE3(A,v,f,lambdaHat,nShots,m)
+	counts = myQPE3(A,v,f,lambdaHat,m=m)
 	
 print("counts:", counts)
-[thetaValues, probabilities] = processCounts(counts)
-print("theta:", thetaValues)
-print("probability:",probabilities)
-print("Weighted average",np.sum(thetaValues*probabilities))
-print("Eigenvalues:",thetaValues*lambdaHat/f)
+thetaTilde = processCounts(counts)
+print("thetaTilde:", thetaTilde)
+print("EigenvalueTilde:",thetaTilde*lambdaHat/f)
 
 #%% Using the Built in QPE
 m = 3
@@ -493,6 +490,5 @@ iqft._name = 'IQFT'
 qpe = PhaseEstimation(m,U_A,iqft)
 
 #%%
-
-
-	
+counts = KitaevCircuit(A,v,f,lambdaHat,nShots=1000)
+print("counts:", counts)
