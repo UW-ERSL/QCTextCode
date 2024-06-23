@@ -119,6 +119,8 @@ class HHLQiskit:
 		qpeInverse = self.constructQPECircuit('IQPE').inverse()
 		self.HHLCircuit.barrier()
 		self.HHLCircuit.compose(qpeInverse,[*range(0,1+self.m+self.n)], [*range(0,1+self.n)],inplace = True)
+		self.HHLCircuit.barrier()
+		self.HHLCircuit.measure([0,*range(1+self.m,1+self.m+self.n)], [0,*range(0,self.n)]) 
 		return 
 		
 	def computeCompliance(self):
@@ -139,9 +141,9 @@ class HHLQiskit:
 			return False
 
 		## Step 1: Construct  QPE circuit and estimate theta
-		self.qpeCircuit = self.constructQPECircuit('QPE')
-		self.qpeCircuit.measure([*range(0,self.m)], [*range(0,self.m)]) 
-		counts = self.simulateCircuit(self.qpeCircuit,self.nQPEShots)
+		self.QPECircuit = self.constructQPECircuit('QPE')
+		self.QPECircuit.measure([*range(0,self.m)], [*range(0,self.m)]) 
+		counts = self.simulateCircuit(self.QPECircuit,self.nQPEShots)
 		self.processQPECounts(counts)
 		print('\u03B8 estimate: ', self.thetaTilde)
 		print('\u03BB estimate: ', self.lambdaTilde)
@@ -150,11 +152,9 @@ class HHLQiskit:
 		self.C = 0.99*min(self.lambdaTilde)
 		
 		self.constructHHLCircuit()
-		self.HHLCircuit.barrier()
-		self.HHLCircuit.measure([0,*range(1+self.m,1+self.m+self.n)], [0,*range(0,self.n)]) 
-	
-		counts = self.simulateCircuit(self.HHLCircuit,self.nHHLShots)
-		print(counts)
+		
+		HHLCounts = self.simulateCircuit(self.HHLCircuit,self.nHHLShots)
+		print(HHLCounts)
 		
 		return True
 #################################
@@ -173,10 +173,10 @@ if __name__ == '__main__':
 	nHHLShots = 1000
 	if (example == 1):
 		A = np.array([[1,0],[0,0.75]])
-		b = np.array([1,1])/np.sqrt(2)
+		b = np.array([1,0])
 		f = 0.5
 		lambdaHat = 1
-		m = 3
+		m = 1
 	elif (example == 2):
 		A = np.array([[2,-1],[-1,2]])
 		b = np.array([0,1])
@@ -185,10 +185,10 @@ if __name__ == '__main__':
 		m = 3
 	elif (example == 3):
 		A = np.array([[1,0,0,-0.5],[0,1,0,0],[0,0,1,0],[-0.5,0,0,1]])
-		b = np.array([0,1])
+		b = np.array([1,1,1,1])/np.sqrt(4)
 		f = 0.5
 		lambdaHat = 1
-		m = 3
+		m = 2
 	elif (example == 4):
 		A = np.array([[2,-1,0,0],[-1,2,-1,0],[0,-1,2,-1],[0,0,-1,2]])
 		b = np.array([0,1])
@@ -205,10 +205,10 @@ if __name__ == '__main__':
 	# Execute main code
 	HHL.execute()
 	
-	HHL.qpeCircuit.draw('mpl')
+	HHL.QPECircuit.draw('mpl')
 	HHL.HHLCircuit.draw('mpl')
 	
-	if (1):# if debug
+	if (debug):# if debug
 		HHL.solveExact();
 		print("Exact sol A:\n", HHL.x_exact)
 		HHL.computeEigen()
