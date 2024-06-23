@@ -43,12 +43,13 @@ if (0): # Change to 1 to run on a real IBM quantum machine
 	result = job.result()
 	print(result)
 #%% Modules needed for al examples below
-from qiskit import QuantumCircuit, transpile
+from qiskit import QuantumCircuit, transpile, QuantumRegister, ClassicalRegister
 from IPython.display import display
 from qiskit.quantum_info import Statevector, Operator
 from qiskit.visualization import plot_histogram
 from qiskit.circuit.library import UnitaryGate, HamiltonianGate
 from qiskit.circuit.library import QFT, PhaseEstimation
+from qiskit.circuit.library.standard_gates.u import UGate
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -150,6 +151,18 @@ circuit.draw('mpl')
 counts = simulateCircuit(circuit,1000)
 print('Counts:',counts)
 
+#%% Universal operator
+def UniversalOperator(theta,phi,lambdaAngle):
+	U = np.array([[np.cos(theta/2),-np.exp(1j*lambdaAngle)*np.sin(theta/2)],
+			      [np.exp(1j*phi)*np.sin(theta/2), np.exp(1j*(phi+lambdaAngle))*np.cos(theta/2)]])
+	return U
+
+U = UniversalOperator(np.pi/2,np.pi,np.pi)
+print(U)
+U = UniversalOperator(np.pi,0,0)
+print(U)
+
+
 #%% Simple CNOT
 circuit = QuantumCircuit(2, 2)  
 circuit.x(1) # try id(1), h(1)
@@ -214,6 +227,18 @@ UControl = U.control(1)
 circuit.append(UControl,[1,0])
 circuit.measure([0,1],[0,1]) 
 circuit.draw('mpl') 
+
+
+#%% state controlled U Gate
+circuit = QuantumCircuit(4, 1) 
+cu_gate = UGate(np.pi, 0, 0).control(3, ctrl_state = '101')
+# Not sure why the following does not work
+# circuit.cry(theta = np.pi/3,target_qubit= 0,
+#      control_qubit = [1,2,3], ctrl_state = '101')
+circuit.append(cu_gate,[1,2,3,0])
+circuit.measure([0],[0]) 
+circuit.draw('mpl') 
+
 
 #%% continuous signal
 def continuousSignal(t):
@@ -372,13 +397,18 @@ def myQPE2(A,v,f,lambdaHat):
 	circuit.measure([0], [0]) 
 	return simulateCircuit(circuit,nShots=1)
 
+
 #%% Multiple digit QPE with multiple qubits v
 def myQPE3(A,v,f,lambdaHat,m=1):
-	n = int(np.log2(v.shape[0]))
-	circuit = QuantumCircuit(n+m,m)
+	N = v.shape[0]
+	n = int(np.log2(N))
+	phase_qubits = QuantumRegister(m, '\u03B8')
+	input_qubits = QuantumRegister(n, 'b')
+	phase_measurements = ClassicalRegister(m, '\u0398')
+	circuit = QuantumCircuit(phase_qubits,input_qubits,phase_measurements)
 	for i in range(m):
 		circuit.h(i)
-	circuit.prepare_state(Statevector(v),[*range(m, n+m)],'v')
+	circuit.prepare_state(Statevector(v),[*range(m, n+m)],'b')
 	t = -2*np.pi*f/lambdaHat #Note negative
 	U_A = HamiltonianGate(A, time=t,label = 'UA')
 	U_A._name = 'UA'
@@ -390,7 +420,7 @@ def myQPE3(A,v,f,lambdaHat,m=1):
 	iqft._name = 'IQFT'
 	circuit.append(iqft, [*range(0,m)])
 	circuit.measure([*range(0,m)], [*range(0,m)]) 
-	#circuit.draw('mpl') 
+	circuit.draw('mpl') 
 	counts = simulateCircuit(circuit,nShots=50)
 	return counts
 
@@ -399,6 +429,7 @@ def processCounts(counts):
 	# Input:  counts from circuit simulation 
 	# Return: decimal values sorted by descending probability
 	# First sort descending using 2nd item in dictionary
+
 	countsSorted = sorted(counts.items(),
 		key=lambda item: item[1],reverse=True)
 	m = len(countsSorted[0][0]) # length of bit string
@@ -408,25 +439,10 @@ def processCounts(counts):
 		values.append(int(string, 2)/(2**m))
 	return np.array(values)
 
-#%% Kitaev circuit
-def KitaevCircuit(A,v,f,lambdaHat,nShots):
-	n = int(np.log2(v.shape[0]))
-	circuit = QuantumCircuit(n+1,1)
-	circuit.h(0)
-	circuit.prepare_state(Statevector(v),[*range(1, n+1)],'v')
-	t = -2*np.pi*f/lambdaHat #Note negative
-	U_A = HamiltonianGate(A, time=t,label = 'UA')
-	UControl = U_A.control(1) # only 1 control qubit
-	circuit.append(UControl,[*range(0, n+1)])
-	circuit.h(0)
-	circuit.measure([0], [0]) 
-	circuit.draw('mpl')
-	return simulateCircuit(circuit,nShots)
-
 
 #%% Test cases for QPE
 plt.close('all')
-example = 4
+example = 2
 if (example == 1):
 	A = np.array([[1,0],[0,0.75]])
 	v0 = np.array([1,0])
@@ -436,7 +452,7 @@ if (example == 1):
 	v = a0*v0 +  a1*v1
 	f = 0.5
 	lambdaHat = 1
-	m = 3
+	m = 2
 	counts = myQPE3(A,v,f,lambdaHat,m=m)
 elif (example == 2):
 	A = np.array([[2,-1],[-1,2]])
@@ -456,10 +472,11 @@ elif (example == 3):
 	v2 = np.array([0,1,0,0])
 	v3 = np.array([0,0,1,0])
 	a = [1/np.sqrt(4),1/np.sqrt(4),1/np.sqrt(4),1/np.sqrt(4)]
+	#a = [1,0,0,0]
 	v = a[0]*v0 + a[1]*v1 + a[2]*v2 + a[3]*v3
 	f = 0.5
 	lambdaHat = 1.5
-	m = 10
+	m = 2
 	counts = myQPE3(A,v,f,lambdaHat,m=m)
 elif (example == 4):
 	A = np.array([[2,-1,0,0],[-1,2,-1,0],[0,-1,2,-1],[0,0,-1,2]])
@@ -467,7 +484,7 @@ elif (example == 4):
 	v = v/np.linalg.norm(v)
 	f = 0.5
 	lambdaHat = 4
-	m = 10
+	m = 2
 	counts = myQPE3(A,v,f,lambdaHat,m=m)
 	
 print("counts:", counts)
@@ -489,6 +506,78 @@ iqft = QFT(num_qubits=m,inverse=True).to_gate()
 iqft._name = 'IQFT'
 qpe = PhaseEstimation(m,U_A,iqft)
 
+#%%  Controlled Rotation
+circuit = QuantumCircuit(2,1)
+theta = np.pi/3
+circuit.cry(theta,1, 0)
+circuit.draw('mpl') 
+
 #%%
-counts = KitaevCircuit(A,v,f,lambdaHat,nShots=1000)
-print("counts:", counts)
+
+def myQPECircuit(A,b,f,lambdaHat,m):
+	N = A.shape[0]
+	n = int(np.log2(N))
+	phase_qubits = QuantumRegister(m, '\u03B8')
+	b_qubits = QuantumRegister(n, 'b')
+	ancilla_qubit = QuantumRegister(1,'a')
+	cl = ClassicalRegister(m,'cl')
+	offset = 1
+	circuit = QuantumCircuit(ancilla_qubit, phase_qubits, b_qubits,cl)
+		
+	for i in range(m):
+		circuit.h(offset+i)
+	if (len(b) != 0):
+		circuit.prepare_state(Statevector(b),[*range(m+offset, n+m+offset)],'b')
+	t = -2*np.pi*f/lambdaHat #Note negative
+	U_A = HamiltonianGate(A, time=t,label = 'UA')
+	U_A._name = 'UA'
+	for i in range(m):
+		U_A_pow = U_A.power(2**i) 
+		UControl = U_A_pow.control(1) # only 1 control qubit
+		circuit.append(UControl,[i+offset,*range(m+offset, n+m+offset)])
+	iqft = QFT(num_qubits=m,inverse=True).to_gate()
+	iqft._name = 'IQFT'
+	circuit.append(iqft, [*range(offset,m+offset)])
+	return circuit
+	
+
+#%% QPE with Controlled Rotation
+def controlledRotationQPE(A,v,f,lambdaHat,m):
+	N = v.shape[0]
+	n = int(np.log2(N))
+	# construct  QPE circuit with controlled Rotation
+	qpeCircuit = myQPECircuit(A,v,f,lambdaHat,m)
+	qpeCircuit.measure([*range(1,m+1)], [*range(0,m)]) 
+
+	counts = simulateCircuit(qpeCircuit,nShots=50)
+	countsSorted = sorted(counts.items(),
+		key=lambda item: item[1],reverse=True)
+
+	thetaTilde = processCounts(counts)[0:N]
+	lambdaTilde = thetaTilde*lambdaHat/f
+	print(thetaTilde)
+	C = 0.99*min(lambdaTilde)
+	print(C)
+	HHLCircuit = myQPECircuit(A,v,f,lambdaHat,m)
+	HHLCircuit.barrier()
+	
+	nControlledRotations = min(len(countsSorted),N)
+	for i in range(nControlledRotations):
+		string = countsSorted[i][0] 
+		theta = np.pi/(i+1)
+		cu_gate = UGate(theta, 0, 0).control(m, ctrl_state = string) 
+		HHLCircuit.append(cu_gate,[*range(1,1+m),0])
+	
+	qpeInverse = myQPECircuit(A,[],f,lambdaHat,m).inverse()
+	qpeInverse._name = 'IQPE'
+	qpeInverse.draw('mpl')
+	HHLCircuit.barrier()
+	HHLCircuit.compose(qpeInverse,[*range(0,1+m+n)], [*range(0,m)],inplace = True)
+	HHLCircuit.draw('mpl')
+	
+	return 
+
+#%%
+plt.close('all')
+m=2
+counts = controlledRotationQPE(A,v,f,lambdaHat,m)
